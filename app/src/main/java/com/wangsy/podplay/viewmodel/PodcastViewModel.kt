@@ -2,15 +2,21 @@ package com.wangsy.podplay.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.viewModelScope
 import com.wangsy.podplay.model.Episode
 import com.wangsy.podplay.model.Podcast
 import com.wangsy.podplay.repository.PodcastRepo
+import kotlinx.coroutines.launch
 import java.util.*
 
 class PodcastViewModel(application: Application) : AndroidViewModel(application) {
 
     var podcastRepo: PodcastRepo? = null
     var activePodcastViewData: PodcastViewData? = null
+    private val _podcastLiveData = MutableLiveData<PodcastViewData?>()
+    val podcastLiveData: LiveData<PodcastViewData?> = _podcastLiveData
 
     data class PodcastViewData(
         var subscribed: Boolean = false,
@@ -30,26 +36,20 @@ class PodcastViewModel(application: Application) : AndroidViewModel(application)
         var duration: String? = ""
     )
 
-    // 1
-    fun getPodcast(podcastSummaryViewData: SearchViewModel.PodcastSummaryViewData): PodcastViewData? {
-        // 2
-        val repo = podcastRepo ?: return null
-        val feedUrl = podcastSummaryViewData.feedUrl ?: return null
-        // 3
-        val podcast = repo.getPodcast(feedUrl)
-        // 4
-        podcast?.let {
-            // 5
-            it.feedTitle = podcastSummaryViewData.name ?: ""
-            // 6
-            it.imageUrl = podcastSummaryViewData.imageUrl ?: ""
-            // 7
-            activePodcastViewData = podcastToPodcastView(it)
-            // 8
-            return activePodcastViewData
+    fun getPodcast(podcastSummaryViewData: SearchViewModel.PodcastSummaryViewData) {
+        podcastSummaryViewData.feedUrl?.let { url ->
+            viewModelScope.launch {
+                podcastRepo?.getPodcast(url)?.let {
+                    it.feedTitle = podcastSummaryViewData.name ?: ""
+                    it.imageUrl = podcastSummaryViewData.imageUrl ?: ""
+                    _podcastLiveData.value = podcastToPodcastView(it)
+                } ?: run {
+                    _podcastLiveData.value = null
+                }
+            }
+        } ?: run {
+            _podcastLiveData.value = null
         }
-        // 9
-        return null
     }
 
     private fun podcastToPodcastView(podcast: Podcast): PodcastViewData {
