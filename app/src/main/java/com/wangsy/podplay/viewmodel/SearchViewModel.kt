@@ -2,12 +2,16 @@ package com.wangsy.podplay.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.Transformations
+import com.wangsy.podplay.model.Podcast
 import com.wangsy.podplay.repository.ItunesRepo
 import com.wangsy.podplay.service.PodcastResponse
 import com.wangsy.podplay.util.DateUtils
 
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
     var iTunesRepo: ItunesRepo? = null
+    var livePodcastSummaryData: LiveData<List<PodcastSummaryViewData>>? = null
 
     data class PodcastSummaryViewData(
         var name: String? = "",
@@ -44,5 +48,4 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
             itunesPodcast.artworkUrl30,
             itunesPodcast.feedUrl)
     }
-
 }
