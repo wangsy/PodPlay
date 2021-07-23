@@ -12,6 +12,12 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 
 class PodcastRepo(private var feedService: RssFeedService, private var podcastDao: PodcastDao) {
+    class PodcastUpdateInfo(
+        val feedUrl: String,
+        val name: String,
+        val newCount: Int
+    )
+
     suspend fun getPodcast(feedUrl: String): Podcast? {
         val podcastLocal = podcastDao.loadPodcast(feedUrl)
         if (podcastLocal != null) {
@@ -52,6 +58,28 @@ class PodcastRepo(private var feedService: RssFeedService, private var podcastDa
         }
     }
 
+    suspend fun updatePodcastEpisodes() : MutableList<PodcastUpdateInfo> {
+        // 1
+        val updatedPodcasts: MutableList<PodcastUpdateInfo> = mutableListOf()
+        // 2
+        val podcasts = podcastDao.loadPodcastsStatic()
+        // 3
+        for (podcast in podcasts) {
+            // 4
+            val newEpisodes = getNewEpisodes(podcast)
+            // 5
+            if (newEpisodes.count() > 0) {
+                podcast.id?.let {
+                    saveNewEpisodes(it, newEpisodes)
+                    updatedPodcasts.add(PodcastUpdateInfo(
+                        podcast.feedUrl, podcast.feedTitle, newEpisodes.count()))
+                }
+            }
+        }
+        // 6
+        return updatedPodcasts
+    }
+
     private fun rssResponseToPodcast(feedUrl: String, imageUrl: String, rssResponse: RssFeedResponse): Podcast? {
         // 1
         val items = rssResponse.episodes ?: return null
@@ -75,6 +103,34 @@ class PodcastRepo(private var feedService: RssFeedService, private var podcastDa
                 DateUtils.xmlDateToDate(it.pubDate),
                 it.duration ?: ""
             )
+        }
+    }
+
+    private suspend fun getNewEpisodes(localPodcast: Podcast): List<Episode> {
+        // 1
+        val response = feedService.getFeed(localPodcast.feedUrl)
+        if (response != null) {
+            // 2
+            val remotePodcast = rssResponseToPodcast(localPodcast.feedUrl, localPodcast.imageUrl, response)
+            remotePodcast?.let {
+                // 3
+                val localEpisodes = podcastDao.loadEpisodes(localPodcast.id!!)
+                // 4
+                return remotePodcast.episodes.filter { episode ->
+                    localEpisodes.find { episode.guid == it.guid } == null
+                }
+            }
+        }
+        // 5
+        return listOf()
+    }
+
+    private fun saveNewEpisodes(podcastId: Long, episodes: List<Episode>) {
+        GlobalScope.launch {
+            for (episode in episodes) {
+                episode.podcastId = podcastId
+                podcastDao.insertEpisode(episode)
+            }
         }
     }
 

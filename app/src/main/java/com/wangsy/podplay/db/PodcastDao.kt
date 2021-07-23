@@ -30,5 +30,8 @@ interface PodcastDao {
     @Query("SELECT * FROM Podcast ORDER BY FeedTitle")
     fun loadPodcasts(): LiveData<List<Podcast>>
 
+    @Query("SELECT * FROM Podcast ORDER BY FeedTitle")
+    fun loadPodcastsStatic(): List<Podcast>
+
 }
 
